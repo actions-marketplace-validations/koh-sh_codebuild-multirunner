@@ -28,7 +28,8 @@
 **/secrets.dev.yaml
 **/values.dev.yaml
 **/.github
-**/misc
+**/_misc
+**/_testscripts
 LICENSE
 README.md
 Makefile

@@ -4,14 +4,20 @@
 
 This is a simple CLI tool to "Start build with overrides" multiple AWS CodeBuild Projects at once.
 
-![Img](misc/ss.png)
+![Img](_misc/ss.png)
 
 ## Installation
 
 You can install with Homebrew.
 
 ```bash
-brew install koh-sh/tap/codebuild-multirunner
+brew install --cask koh-sh/tap/codebuild-multirunner
+```
+
+Or install with mise.
+
+```bash
+mise use -g github:koh-sh/codebuild-multirunner
 ```
 
 Or download prebuild binary from [Releases](https://github.com/koh-sh/codebuild-multirunner/releases)
@@ -49,23 +55,101 @@ Use "codebuild-multirunner [command] --help" for more information about a comman
 Create YAML based config file.
 change "testproject" to your CodeBuild Project name.
 
+**⚠️ Important Notice: List Format is Deprecated**
+
+The list format for the `builds` section is now deprecated and will show a warning message when used. Please use the map format instead for new configurations.
+
+**Legacy List Format (Deprecated):**
 ```bash
 % cat .codebuild-multirunner.yaml
 builds:
   - projectName: testproject
 ```
 
+**Recommended Map Format:**
+
+Use a map format to group builds. This allows you to target specific groups for execution using the `--targets` flag.
+
+```yaml
+# .codebuild-multirunner.yaml (Map format)
+builds:
+  group1:
+    - projectName: testproject-a
+      sourceVersion: main
+    - projectName: testproject-b
+  group2:
+    - projectName: testproject-c
+      environmentVariablesOverride:
+        - name: STAGE
+          value: production
+```
+
 ### Run
 
-Then execute command with "run" subcommand, so your CodeBuild project will be running.
+Then execute command with "run" subcommand.
+
+If you are using the legacy list format (deprecated), all defined projects will be executed. **Note: You will see a deprecation warning message when using the list format:**
+
+```bash
+codebuild-multirunner run
+# ⚠️  WARNING: List format for 'builds' is deprecated. Please migrate to map format.
+```
+
+If you are using the new map format, you can run all builds in all groups:
 
 ```bash
 codebuild-multirunner run
 ```
 
-If you specify multiple projects, all projects will be running at once.
+Or run only specific groups using the `--targets` flag:
 
 ```bash
+# Runs only the builds defined under 'group1'
+codebuild-multirunner run --targets group1
+
+# Runs builds defined under 'group1' AND 'group2'
+codebuild-multirunner run --targets group1 --targets group2
+```
+
+**Note:** The `--targets` flag is only available when using the map format for the `builds` section in your configuration file.
+
+### Migration Guide: List Format to Map Format
+
+If you are currently using the deprecated list format, here's how to migrate to the recommended map format:
+
+**Before (List Format - Deprecated):**
+```yaml
+builds:
+  - projectName: testproject-frontend
+  - projectName: testproject-backend
+    environmentVariablesOverride:
+      - name: STAGE
+        value: production
+  - projectName: testproject-batch
+```
+
+**After (Map Format - Recommended):**
+```yaml
+builds:
+  default:  # You can use any group name
+    - projectName: testproject-frontend
+    - projectName: testproject-backend
+      environmentVariablesOverride:
+        - name: STAGE
+          value: production
+    - projectName: testproject-batch
+```
+
+This migration allows you to:
+- Eliminate the deprecation warning
+- Group your builds logically
+- Use the `--targets` flag to run specific groups
+- Maintain the same functionality while future-proofing your configuration
+
+If you specify multiple projects (either in the list format or across multiple groups in the map format without targeting), all selected projects will be running at once.
+
+```bash
+# Example using deprecated list format (will show warning)
 % cat .codebuild-multirunner.yaml
 builds:
   - projectName: testproject
@@ -73,32 +157,35 @@ builds:
   - projectName: testproject3
 ```
 
-You can "Start build with overrides" by specifying parameters.
+You can "Start build with overrides" by specifying parameters within each build definition:
 
 ```bash
 % cat .codebuild-multirunner.yaml
 builds:
-  - projectName: testproject
-  - projectName: testproject2
-    environmentVariablesOverride:
-    - name: TEST_VAR
-      value: FOOBAR
-      type: PLAINTEXT
-  - projectName: testproject3
+  web-app:
+    - projectName: testproject-frontend
+    - projectName: testproject-backend
+      environmentVariablesOverride:
+      - name: TEST_VAR
+        value: FOOBAR
+        type: PLAINTEXT
+  batch-job:
+    - projectName: testproject-batch
 ```
 
 Also environment variables are substituted for execution.
 
-```bash
+```yaml
 builds:
-- projectName: testproject
-- projectName: testproject2
-  environmentVariablesOverride:
-    - name: TEST_VAR
-      value: FOOBAR
-      type: PLAINTEXT
-- projectName: testproject3
-  sourceVersion: ${BRANCH_NAME} # it will read environment variable
+  my-app:
+    - projectName: testproject
+    - projectName: testproject2
+      environmentVariablesOverride:
+        - name: TEST_VAR
+          value: FOOBAR
+          type: PLAINTEXT
+    - projectName: testproject3
+      sourceVersion: ${BRANCH_NAME} # it will read environment variable
 ```
 
 You can check the config by "dump" subcommand.
@@ -107,6 +194,7 @@ You can check the config by "dump" subcommand.
 % export BRANCH_NAME=feature/new_function
 % codebuild-multirunner dump
 builds:
+  my-app:
     - projectName: testproject
     - environmentVariablesOverride:
         - name: TEST_VAR
@@ -115,7 +203,6 @@ builds:
       projectName: testproject2
     - projectName: testproject3
       sourceVersion: feature/new_function
-
 %
 ```
 
@@ -189,6 +276,10 @@ inputs:
      description: 'file path for config file. (default "./.codebuild-multirunner.yaml")'
      required: false
      default: '.codebuild-multirunner.yaml'
+   targets:
+     description: 'comma separated list of target group names to run (only used if config is in map format)'
+     required: false
+     default: ''
    polling-span:
      description: 'polling span in second for builds status check (default 60)'
      required: false

@@ -1,18 +1,13 @@
-.PHONY: setup test fmt cov tidy run lint dockerbuild dockerrun
+.PHONY: test fmt cov tidy run lint dockerbuild dockerrun blackboxtest modernize modernize-fix
 
 COVFILE = coverage.out
 COVHTML = cover.html
 
-setup:
-	go install github.com/mfridman/tparse@latest
-	go install mvdan.cc/gofumpt@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
 test:
-	go test ./... -json | tparse -all
+	go test ./... -json | go tool tparse -all
 
 fmt:
-	gofumpt -l -w *.go
+	go tool gofumpt -l -w .
 
 cov:
 	go test -cover ./... -coverprofile=$(COVFILE)
@@ -23,7 +18,16 @@ tidy:
 	go mod tidy -v
 
 lint:
-	golangci-lint run -v
+	go tool golangci-lint run -v
+
+ci: fmt modernize-fix lint test
+
+# Go Modernize
+modernize:
+	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -test ./...
+
+modernize-fix:
+	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix ./...
 
 # for testing
 dockerbuild:
@@ -31,3 +35,6 @@ dockerbuild:
 
 dockerrun:
 	docker run -it --rm -v ~/.aws:/root/.aws -v ~/.codebuild-multirunner.yaml:/.codebuild-multirunner.yaml codebuild-multirunner:latest -v
+
+blackboxtest:
+	./_testscripts/blackbox.sh

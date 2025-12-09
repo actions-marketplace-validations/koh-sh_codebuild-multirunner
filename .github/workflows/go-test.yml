@@ -15,12 +15,12 @@ permissions:
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
 
@@ -34,4 +34,4 @@ jobs:
       run: go test -v ./... -coverprofile=coverage.out
 
     - name: check coverage
-      uses: k1LoW/octocov-action@v0
+      uses: k1LoW/octocov-action@v1
